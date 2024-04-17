@@ -3,6 +3,13 @@ import * as THREE from 'three';
 import { MapControls } from 'three/examples/jsm/Addons.js';
 import * as geolib from 'geolib';
 
+/* 
+   Credits
+   
+   The logic used to extract osm data and display them with three.js is by Jeff Wu thank you good sure. 
+   Here is the link to the code: https://jsfiddle.net/jeffwu00/z0tLx7sj/2/
+*/
+
 var MAT_BUILDING
 const center = [-3.188822, 55.943686] //[36.99283, -122.05855]
 

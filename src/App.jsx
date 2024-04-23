@@ -1,27 +1,28 @@
 import { useState } from 'react'
 import reactLogo from './assets/react.svg'
 import viteLogo from '/vite.svg'
-import Map from './components/Map'
+// import Map from './components/Map'
 import './App.css'
+import Iframe from 'react-iframe'
+
 
 function App() {
   const [count, setCount] = useState(0)
 
   return (
     <>
-      <div>
-        <a href="https://vitejs.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
+    {/* Title of Site */}
+    <div>
       <h1>EasyRoute</h1>
-      <Map />
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
+    </div>
+    {/* Added iframe for locally hosted map*/}
+    <div>
+      <iframe
+        width="1125px"
+        height="625px"
+        src="https://ucsc.maps.arcgis.com/apps/instant/3dviewer/index.html?appid=8fe04a1bb50141e081472ca07d8fe1f8"
+        style={{ border: 'none', display: 'block' }}></iframe>
+    </div>
     </>
   )
 }

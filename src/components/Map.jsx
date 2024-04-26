@@ -11,9 +11,7 @@ import * as geolib from 'geolib';
 */
 
 var MAT_BUILDING
-const center = [-3.188822, 55.943686] //[36.99283, -122.05855]
-
-const api = "https://gistcdn.githack.com/isjeffcom/a611e99aa888534f67cc2f6273a8d594/raw/9dbb086197c344c860217826c59d8a70d33dcb54/gistfile1.txt"
+const center = [36.99283, -122.05855]
 
 function Map() {
     const [count, setCount] = useState(0);
@@ -79,7 +77,7 @@ function Map() {
         animate();
 
         function GetGeoJson() {
-            fetch(api)
+            fetch('/ucsc.geojson')
                 .then((response) => {
                     if (!response.ok) {
                         throw new Error('Network response was not ok ' + response.statusText);
@@ -87,7 +85,6 @@ function Map() {
                     return response.json();
                 })
                 .then((data) => {
-                    console.log("hi")
                     LoadBuildings(data);
                 })
                 .catch((error) => {
@@ -100,42 +97,39 @@ function Map() {
 
             let features = data.features
 
-            for (let i = 0; i < features.length; i++) {
-                console.log(features[i])
+            console.log(features);
+            console.log("Start");
+            for (let i = 0; i < 10; i++) {
 
                 let fel = features[i]
                 if (!fel['properties']) return
 
                 if (fel.properties['building']) {
-                    addBuilding(fel.geometry.coordinates, fel.properties, fel.properties["building:levels"])
+                    console.log(fel.geometry.coordinates)
+                    //addBuilding()
                 }
             }
+            console.log("End");
         }
 
-        function addBuilding(data, info, height = 1) {
-
-            console.log("data", data)
+        function addBuilding(data, height = 1) {
 
             height = height ? height : 1
 
-            for (let i = 0; i < data.length; i++) {
-                let el = data[i]
+            let shape = genShape(el, center)
+            let geometry = genGeometry(shape, {
+                curveSegments: 1,
+                depth: 0.05 * height,
+                bevelEnabled: false
+            })
 
-                let shape = genShape(el, center)
-                let geometry = genGeometry(shape, {
-                    curveSegments: 1,
-                    depth: 0.05 * height,
-                    bevelEnabled: false
-                })
+            console.log("end of generating object");
 
-                geometry.rotateX(Math.PI / 2)
-                geometry.rotateZ(Math.PI)
+            // geometry.rotateX(Math.PI / 2)
+            // geometry.rotateZ(Math.PI)
 
-                let mesh = new THREE.Mesh(geometry, MAT_BUILDING)
-                scene.add(mesh)
-            }
-
-
+            let mesh = new THREE.Mesh(geometry, MAT_BUILDING)
+            scene.add(mesh)
         }
 
         function genShape(points, center) {

@@ -39,12 +39,12 @@ function Map() {
         const controls = new MapControls(camera, renderer.domElement);
         controls.enableDamping = true
         controls.dampingFactor = .25
-        controls.screenSpacePanning = false
-        controls.maxDistance = 20
+        controls.screenSpacePanning = true
+        controls.maxDistance = 1000
         controls.maxZoom = 50
 
         // Init Light
-        let light0 = new THREE.AmbientLight(0xfafafa, 0.25)
+        let light0 = new THREE.AmbientLight(0xfafafa, 10.25)
 
         let light1 = new THREE.PointLight(0xfafafa, 0.4)
         light1.position.set(20, 30, 10)
@@ -97,47 +97,49 @@ function Map() {
 
             let features = data.features
 
-            console.log(features);
-            console.log("Start");
-            for (let i = 0; i < 10; i++) {
+            for (let i = 0; i < 200; i++) {
 
                 let fel = features[i]
                 if (!fel['properties']) return
 
                 if (fel.properties['building']) {
-                    console.log(fel.geometry.coordinates)
-                    //addBuilding()
+                    addBuilding(fel.geometry.coordinates)
                 }
             }
-            console.log("End");
         }
 
         function addBuilding(data, height = 1) {
 
             height = height ? height : 1
 
-            let shape = genShape(el, center)
-            let geometry = genGeometry(shape, {
-                curveSegments: 1,
-                depth: 0.05 * height,
-                bevelEnabled: false
-            })
+            let shape = genShape(data[0])
 
-            console.log("end of generating object");
+            const extrudeSettings = {
+                steps: 1,
+                depth: 10,
+                bevelEnabled: false,
+                bevelThickness: 0,
+                bevelSize: 0,
+                bevelOffset: 0,
+                bevelSegments: 0
+            };
+
+            let geometry = genGeometry(shape, extrudeSettings);
 
             // geometry.rotateX(Math.PI / 2)
             // geometry.rotateZ(Math.PI)
 
-            let mesh = new THREE.Mesh(geometry, MAT_BUILDING)
+            const mesh = new THREE.Mesh(geometry, MAT_BUILDING)
+            //console.log(mesh.position);
             scene.add(mesh)
         }
 
-        function genShape(points, center) {
+        function genShape(points) {
             let shape = new THREE.Shape()
 
             for (let i = 0; i < points.length; i++) {
                 let elp = points[i]
-                elp = GPSRelativePosition(elp, center)
+                elp = GPSRelativePosition(elp)
 
                 if (i == 0) {
                     shape.moveTo(elp[0], elp[1])
@@ -146,32 +148,42 @@ function Map() {
                 }
             }
 
+            console.log(shape.curves);
+
             return shape
         }
 
         function genGeometry(shape, settings) {
-            let geometry = new THREE.ExtrudeGeometry(shape, settings);
+            let geometry = new THREE.ExtrudeGeometry(shape, settings)
             geometry.computeBoundingBox()
 
             return geometry
         }
 
-        function GPSRelativePosition(objPosi, centerPosi) {
+
+        function GPSRelativePosition(objPosi) {
 
             // Get GPS distance
-            let dis = geolib.getDistance(objPosi, centerPosi)
+            let dis = geolib.getDistance(objPosi, center)
 
-            // Get bearing angle
-            let bearing = geolib.getRhumbLineBearing(objPosi, centerPosi)
+            var start_latitude = center[0]
+            var start_longitude = center[1]
+            var stop_latitude = objPosi[0]
+            var stop_longitude = objPosi[1]
+
+            // Equation to calculate the bearing between the two points. 
+            var a = Math.sin(stop_longitude - start_longitude) * Math.cos(stop_latitude);
+            var b = Math.cos(start_latitude) * Math.sin(stop_latitude) - Math.sin(start_latitude) * Math.cos(stop_latitude) * Math.cos(stop_longitude - start_longitude);
+            var bearing = Math.atan2(a, b) * 180 / Math.PI;
 
             // Calculate X by centerPosi.x + distance * cos(rad)
-            let x = centerPosi[0] + (dis * Math.cos(bearing * Math.PI / 180))
+            let x = center[0] + (dis * Math.cos(bearing * Math.PI / 180))
 
             // Calculate Y by centerPosi.y + distance * sin(rad)
-            let y = centerPosi[1] + (dis * Math.sin(bearing * Math.PI / 180))
+            let y = center[1] + (dis * Math.sin(bearing * Math.PI / 180))
 
             // Reverse X (it work) 
-            return [-x / 100, y / 100]
+            return [-x / 100, (y / 100)]
         }
 
         // Cleanup function

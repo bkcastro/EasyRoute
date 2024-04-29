@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { MapControls } from 'three/examples/jsm/Addons.js';
 import * as geolib from 'geolib';
@@ -11,10 +11,23 @@ import * as geolib from 'geolib';
 */
 
 var MAT_BUILDING
-const center = [36.99283, -122.05855]
+const center = [36.9916,-122.0583]
+
+function calcualateCentroid(coords) {
+    // Calculate centroid
+    let centroidX = 0, centroidY = 0;
+    coords.forEach(coord => {
+        centroidX += coord[0];
+        centroidY += coord[1];
+    });
+    centroidX /= coords.length;
+    centroidY /= coords.length;
+
+    console.log("Centroid:", centroidX, centroidY);
+    return [centroidX, centroidY]
+}
 
 function Map() {
-    const [count, setCount] = useState(0);
     const mountRef = useRef(null);
 
     useEffect(() => {
@@ -32,8 +45,8 @@ function Map() {
         camera.position.y = 10;
         camera.position.x = 20;
 
-        // Grid helper 
-        scene.add(new THREE.GridHelper(50, 50));
+        let gridHelper = new THREE.GridHelper(60, 160, new THREE.Color(0x555555), new THREE.Color(0x333333))
+        scene.add(gridHelper)
 
         // Map Controls 
         const controls = new MapControls(camera, renderer.domElement);
@@ -41,7 +54,7 @@ function Map() {
         controls.dampingFactor = .25
         controls.screenSpacePanning = true
         controls.maxDistance = 1000
-        controls.maxZoom = 50
+       
 
         // Init Light
         let light0 = new THREE.AmbientLight(0xfafafa, 10.25)
@@ -77,7 +90,7 @@ function Map() {
         animate();
 
         function GetGeoJson() {
-            fetch('/ucsc.geojson')
+            fetch('/UCSC_Buildings.geojson')
                 .then((response) => {
                     if (!response.ok) {
                         throw new Error('Network response was not ok ' + response.statusText);
@@ -85,7 +98,9 @@ function Map() {
                     return response.json();
                 })
                 .then((data) => {
+                    console.log("Buildings Starting.");
                     LoadBuildings(data);
+                    console.log("Buildings loaded.", scene);
                 })
                 .catch((error) => {
                     console.error('There was a problem with your fetch operation:', error);
@@ -93,98 +108,97 @@ function Map() {
         }
 
 
-        function LoadBuildings(data) {
+function LoadBuildings(data) {
 
-            let features = data.features
+    let features = data.features
+  
+    for (let i = 0; i < 200; i++) {
+        
+      let fel = features[i]
+      if (!fel['properties']) return
+  
+      if (fel.properties['building']) {
+        addBuilding(fel.geometry.coordinates, fel.properties, fel.properties["building:levels"])
+      }
+    }
+  }
+  
+  function addBuilding(data, info, height = 1) {
+  
+    height = height ? height : 1
+  
+    for (let i = 0; i < data.length; i++) {
+      let el = data[i]
+  
+      let shape = genShape(el)
+      let geometry = genGeometry(shape, {
+        curveSegments: 1,
+        depth: 0.5 * height,
+        bevelEnabled: false
+      })
+  
+      geometry.rotateX(Math.PI / 2)
+      geometry.rotateZ(Math.PI)
+  
+      let mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({color: Math.random()*0x1da12a}))
+      mesh.name = "building"
+      //console.log(mesh.position, mesh.geometry.attributes);
+      scene.add(mesh)
+    }
+  }
+  
+  function genShape(points) {
+    let shape = new THREE.Shape()
 
-            for (let i = 0; i < 200; i++) {
+    let center = calcualateCentroid(points);
+  
+    for (let i = 0; i < points.length; i++) {
+        let elp = points[i]
+        const x = (elp[0] - center[0]) * 50000; // Scaling factor for longitude
+        const y = (elp[1] - center[1]) * 50000; // Scaling factor for latitude
+        console.log(x, y)
+  
+      if (i == 0) {
+        shape.moveTo(x, y)
+      } else {
+        shape.lineTo(x, y)
+      }
+    }
+  
+    return shape
+  }
+  
+  function genGeometry(shape, settings) {
+    let geometry = new THREE.ExtrudeGeometry(shape, settings)
+    //geometry.computeBoundingBox()
+    return geometry
+  }
 
-                let fel = features[i]
-                if (!fel['properties']) return
+  function GPSRelativePosition(objPosi, centerPosi) {
+      // Ensure that positions are in the correct format for geolib
+      const formattedObjPosi = { latitude: objPosi[1], longitude: objPosi[0] };
+      const formattedCenterPosi = { latitude: centerPosi[1], longitude: centerPosi[0] };
+  
+      // Get GPS distance in meters
+      let dis = geolib.getDistance(formattedObjPosi, formattedCenterPosi);
+      //console.log("dis", dis);
+  
+      // Get bearing angle in degrees
+      let bearing = geolib.getGreatCircleBearing(formattedObjPosi, formattedCenterPosi);
+     //console.log("bearing", bearing);
+  
+      // Calculate X by adding to the center's longitude the east/west distance offset
+      // Convert distance from meters to degrees approximately (not precise, depends on latitude)
+      let x = centerPosi[0] + (dis * Math.cos(bearing * Math.PI / 180) / 111320);
+  
+      // Calculate Y by adding to the center's latitude the north/south distance offset
+      // Convert distance from meters to degrees
+      let y = centerPosi[1] + (dis * Math.sin(bearing * Math.PI / 180) / 110540);
+  
+      // Reverse X and scale (adjust the scaling factor according to your needs)
+      return [-x, y];
+  }
 
-                if (fel.properties['building']) {
-                    addBuilding(fel.geometry.coordinates)
-                }
-            }
-        }
-
-        function addBuilding(data, height = 1) {
-
-            height = height ? height : 1
-
-            let shape = genShape(data[0])
-
-            const extrudeSettings = {
-                steps: 1,
-                depth: 10,
-                bevelEnabled: false,
-                bevelThickness: 0,
-                bevelSize: 0,
-                bevelOffset: 0,
-                bevelSegments: 0
-            };
-
-            let geometry = genGeometry(shape, extrudeSettings);
-
-            // geometry.rotateX(Math.PI / 2)
-            // geometry.rotateZ(Math.PI)
-
-            const mesh = new THREE.Mesh(geometry, MAT_BUILDING)
-            //console.log(mesh.position);
-            scene.add(mesh)
-        }
-
-        function genShape(points) {
-            let shape = new THREE.Shape()
-
-            for (let i = 0; i < points.length; i++) {
-                let elp = points[i]
-                elp = GPSRelativePosition(elp)
-
-                if (i == 0) {
-                    shape.moveTo(elp[0], elp[1])
-                } else {
-                    shape.lineTo(elp[0], elp[1])
-                }
-            }
-
-            console.log(shape.curves);
-
-            return shape
-        }
-
-        function genGeometry(shape, settings) {
-            let geometry = new THREE.ExtrudeGeometry(shape, settings)
-            geometry.computeBoundingBox()
-
-            return geometry
-        }
-
-
-        function GPSRelativePosition(objPosi) {
-
-            // Get GPS distance
-            let dis = geolib.getDistance(objPosi, center)
-
-            var start_latitude = center[0]
-            var start_longitude = center[1]
-            var stop_latitude = objPosi[0]
-            var stop_longitude = objPosi[1]
-
-            // Equation to calculate the bearing between the two points. 
-            var a = Math.sin(stop_longitude - start_longitude) * Math.cos(stop_latitude);
-            var b = Math.cos(start_latitude) * Math.sin(stop_latitude) - Math.sin(start_latitude) * Math.cos(stop_latitude) * Math.cos(stop_longitude - start_longitude);
-            var bearing = Math.atan2(a, b) * 180 / Math.PI;
-
-            // Calculate X by centerPosi.x + distance * cos(rad)
-            let x = center[0] + (dis * Math.cos(bearing * Math.PI / 180))
-
-            // Calculate Y by centerPosi.y + distance * sin(rad)
-            let y = center[1] + (dis * Math.sin(bearing * Math.PI / 180))
-
-            // Reverse X (it work) 
-            return [-x / 100, (y / 100)]
-        }
 
         // Cleanup function
         return () => {
